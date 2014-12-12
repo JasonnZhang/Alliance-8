@@ -8,7 +8,7 @@ int teamColor;
 int side;
 int spyLoc;
 float myPos[3];
-float otherXPos;
+float otherPos[3];
 float zero[3];
 float earth[3];
 float darkZone[3];
@@ -16,17 +16,16 @@ int targetPOI;
 float poiPos[3];
 float posTarget[3];
 float poiSpyLoc[3];
+bool powerOn;
 
 //Counters
 int time;
 int picturesTaken;
-int flareCounter;
 
 void init()
 {
     //----Coordinates & Positioning----//
     api.getMyZRState(myState);
-	
 	if (myState[1] > 0)
 	{
 	    teamColor = 0;
@@ -64,12 +63,11 @@ void init()
 	//----Counters----//
 	time = 0;
 	picturesTaken = 0;
-	flareCounter = 0;
 }
 
 void loop()
 {
-    //DEBUG(("\n  targetPOI: %d", targetPOI));
+    DEBUG(("\n  targetPOI: %d", targetPOI));
     
     //----Base Functions----//
     time = api.getTime();
@@ -96,16 +94,24 @@ void loop()
             spyLoc = -1;
         }
         
-        for (int i = 0; i < 3; i++)
-        {
-            posTarget[i] = predictedPOIPos[i] * 2.25;
-        }
-        
     }
     
+    //darkZone[0]= checkDZ();
     darkZone[2]= spyLoc * 0.05;
     
-    if (game.getMemoryFilled() == 0)
+    // turn off if not in dark zone
+    
+    if (game.getNextFlare() <= 1 && game.getNextFlare() != -1 && !((myPos[1]*myPos[1] + myPos[2]*myPos[2] <= 0.2*0.2) && (myPos[0] > 0))) {      
+    //^if flare is coming & not in dark zone
+        game.turnOff();
+        powerOn = false;
+   }
+    else if (!powerOn) {
+        game.turnOn();
+        powerOn = true;
+    }
+
+    if (game.getMemoryFilled() == 0 || time % 60 == 0)
     {
         for (int i = 0; i < 3; i++)
         {
@@ -125,12 +131,6 @@ void loop()
     }
     
     //----Decision Making----//
-    if (game.getNextFlare() == 29)
-    {
-        flareCounter++;
-        DEBUG(("#Flares: %d", flareCounter));
-    }
-    
     if (game.getFuelRemaining() <= 0)
     {
         game.turnOff();
@@ -140,10 +140,10 @@ void loop()
     {
         upload();
     }
-    else if (game.getNextFlare() < 21 && game.getNextFlare() !=-1)
+    else if (game.getNextFlare() < 22 && game.getNextFlare() !=-1)
 	{
-	    game.getPOILoc(poiSpyLoc, targetPOI);
-	    if (poiSpyLoc[2]>0.15)
+        game.getPOILoc(poiSpyLoc, targetPOI);
+        if (poiSpyLoc[2]>0.15)
         {
             spyLoc = 1;
         }
@@ -152,22 +152,8 @@ void loop()
             spyLoc = -1;
         }
         
-        darkZone[2]= spyLoc * 0.05;
-	   
-	    if (flareCounter == 1) //Get other DZ pos
-        {
-            arcMove(darkZone); //Go straight to darkZone
-            
-            if (game.getNextFlare() < 5)
-            {
-                darkZone[0] = checkDZ();
-            }
-        }
-        else
-        {
-            arcMove(darkZone);
-        }
-
+        arcMove(darkZone);
+        
         if (game.getMemoryFilled() > 0)
         {
             upload();
@@ -177,37 +163,30 @@ void loop()
             facePos(predictedPOIPos, myPos);
         }
         
+        //game.getPOILoc(poiPos, targetPOI);
 	}
     else
     {
+        //game.getPOILoc(poiPos, targetPOI);
         arcMove(posTarget);
         facePos(predictedPOIPos, myPos);
     }
 }
 
 //--------------------------------------HELPER METHODS-------------------------------------------//
-float checkDZ()
+/*float checkDZ()
 {
     api.getOtherZRState(otherState);
     
-    otherXPos = otherState[0];
+    for (int i = 0; i<3; i++) 
+    {
+        otherPos[i] = otherState[i];
+    }
     
-    if (otherXPos >= 0.5)
-    {
-        //DEBUG(("They're going long!"));
-        return 0.38;
-    }
-    else if (otherXPos >= 0.45)
-    {
-        //DEBUG(("They're going mid!"));
-        return 0.55;
-    }
-    else
-    {
-        //DEBUG(("They're going short!"));
-        return 0.55;
-    }
-}
+    if (otherPos[0] )
+    
+    
+}*/
 
 
 void facePos(float target[3], float myPos[3])
@@ -273,4 +252,3 @@ void arcMove(float posTarget2[3])
         api.setPositionTarget(posTarget2);
     }
 }
-
